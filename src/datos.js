@@ -42,7 +42,7 @@ const ventas = [
         producto: "Origen Sierra 500 g",
         ciudad: "medellín",
         cantidad: 3,
-        precio: 78000,
+        precio: 45000,
     },
     {
         id: 6,

@@ -76,3 +76,80 @@ Antes de implementar los cálculos analíticos en el script de JavaScript, se de
     SINO
         ticketPromedio = 0 (Evita error por división entre cero)
     FIN SI
+
+# Comportamiento con arreglo vacío
+
+## Regla de venta válida
+Una venta es válida si su `cantidad` es distinta de 0.
+
+## Valores devueltos
+
+| Función | Arreglo vacío `[]` | Solo ventas con cantidad 0 | Justificación |
+|---|---|---|---|
+| `valorVenta(venta)` | No aplica (recibe una venta, no un arreglo) | `0` | Cantidad × precio |
+| `totalVendido(ventas)` | `0` | `0` | Suma de nada; valor inicial del acumulador |
+| `unidadesVendidas(ventas)` | `0` | `0` | Igual que el total |
+| `ventaMayor(ventas)` | `null` | `null` | No existe una venta mayor; no se inventa un registro. Quien la use debe comprobar si es `null` antes de leer `.id` o `.producto` |
+| `ticketPromedio(ventas)` | `0` | `0` | Evita dividir entre 0 (daría `NaN`); en el tablero se lee como "sin ventas" |
+| `ventasPorCiudad(ventas, ciudad)` | `0` | `0` | No hay ventas en esa ciudad |
+
+## 1. `totalVendido`: patrón acumulador (datos corregidos)
+Inicio: `total = 0`. Regla: si `cantidad === 0`, se salta la venta.
+
+| Iter. | ID | Cantidad | Precio | ¿Se salta? | `valorVenta` | `total` antes | `total` después |
+|---|---|---|---|---|---|---|---|
+| 1 | 1 | 2 | 42.000 | No | 84.000 | 0 | 84.000 |
+| 2 | 2 | 1 | 26.000 | No | 26.000 | 84.000 | 110.000 |
+| 3 | 3 | 1 | 95.000 | No | 95.000 | 110.000 | 205.000 |
+| 4 | 4 | 1 | 42.000 | No | 42.000 | 205.000 | 247.000 |
+| 5 | 5 | 3 | 45.000 | No | 135.000 | 247.000 | 382.000 |
+| 6 | 6 | 2 | 26.000 | No | 52.000 | 382.000 | 434.000 |
+| 7 | 7 | 1 | 120.000 | No | 120.000 | 434.000 | 554.000 |
+| 8 | 8 | 0 | 42.000 | **Sí** | (no se calcula) | 554.000 | 554.000 |
+| 9 | 9 | 2 | 45.000 | No | 90.000 | 554.000 | 644.000 |
+| 10 | 10 | 4 | 42.000 | No | 168.000 | 644.000 | 812.000 |
+| 11 | 11 | 1 | 95.000 | No | 95.000 | 812.000 | 907.000 |
+| 12 | 12 | 3 | 26.000 | No | 78.000 | 907.000 | 985.000 |
+
+**Resultado a mano: 985.000. Programa: 985.000. Coincide.**
+
+## 2. `ventaMayor`: patrón máximo (datos corregidos)
+Inicio: `ventaMaxValor = -1`, `ventaMaxRegistro = null`. Se actualiza solo si `valor > ventaMaxValor`.
+
+| Iter. | ID | `valorVenta` | ¿Se salta? | ¿Valor > máximo actual? | Máximo después | Registro guardado |
+|---|---|---|---|---|---|---|
+| 1 | 1 | 84.000 | No | Sí (84.000 > -1) | 84.000 | ID 1 |
+| 2 | 2 | 26.000 | No | No | 84.000 | ID 1 |
+| 3 | 3 | 95.000 | No | Sí | 95.000 | ID 3 |
+| 4 | 4 | 42.000 | No | No | 95.000 | ID 3 |
+| 5 | 5 | 135.000 | No | Sí | 135.000 | ID 5 |
+| 6 | 6 | 52.000 | No | No | 135.000 | ID 5 |
+| 7 | 7 | 120.000 | No | No | 135.000 | ID 5 |
+| 8 | 8 | (no se calcula) | **Sí** | n/a | 135.000 | ID 5 |
+| 9 | 9 | 90.000 | No | No | 135.000 | ID 5 |
+| 10 | 10 | 168.000 | No | Sí | 168.000 | ID 10 |
+| 11 | 11 | 95.000 | No | No | 168.000 | ID 10 |
+| 12 | 12 | 78.000 | No | No | 168.000 | ID 10 |
+
+**Resultado a mano: registro ID 10, valor 168.000. Programa: ID 10, 168.000. Coincide.**
+
+## 3. `ticketPromedio`: patrón contador + acumulador (datos corregidos)
+Inicio: `contadorValidas = 0`. El contador sube con cada venta de `cantidad !== 0`. La traza del contador no cambia (11 ventas válidas, el ID 8 se excluye).
+
+Ticket = 985.000 ÷ 11 = **89.545,4545…**
+
+**Resultado a mano: 89.545,4545… Programa: 89.545,45454545454. Coincide.**
+
+## 4. `ventasPorCiudad(ventas, "Medellín")`: acumulador con normalización
+Inicio: `total = 0`. Buscada normalizada: `"medellín"`.
+
+| ID | Ciudad en los datos | Normalizada | ¿Coincide? | `valorVenta` | `total` después |
+|---|---|---|---|---|---|
+| 1 | `"Medellín"` | `"medellín"` | Sí | 84.000 | 84.000 |
+| 4 | `"Medellín"` | `"medellín"` | Sí | 42.000 | 126.000 |
+| 5 | `"medellín "` | `"medellín"` | Sí | 135.000 | 261.000 |
+| 11 | `"Medellín"` | `"medellín"` | Sí | 95.000 | 356.000 |
+
+Las demás ventas son de Bogotá, Cali o Pereira y no suman.
+
+**Resultado a mano: 356.000. Programa: 356.000. Coincide.**

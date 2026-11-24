@@ -153,3 +153,44 @@ Inicio: `total = 0`. Buscada normalizada: `"medellín"`.
 Las demás ventas son de Bogotá, Cali o Pereira y no suman.
 
 **Resultado a mano: 356.000. Programa: 356.000. Coincide.**
+#  qué pregunta responde cada función
+
+Las cinco preguntas de la sesión: ¿qué recorro?, ¿qué filtro?, ¿qué transformo?, ¿qué acumulo?, ¿cómo agrupo?
+
+Regla de venta válida: `cantidad !== 0`. Las ventas con cantidad 0 se filtran en todas las funciones.
+
+## 1. Versiones con ciclo (`for...of`)
+
+| Función | ¿Qué recorro? | ¿Qué filtro? | ¿Qué transformo? | ¿Qué acumulo? | ¿Cómo agrupo? |
+|---|---|---|---|---|---|
+| `valorVenta(venta)` | Nada: recibe una sola venta | Nada | La venta en su valor: `cantidad × precio` | Nada | No agrupo |
+| `totalVendido(ventas)` | Cada venta de `ventas` | Salto las de `cantidad === 0` | Cada venta en su valor con `valorVenta` | `total`, inicia en 0; sumo cada valor | No agrupo |
+| `unidadesVendidas(ventas)` | Cada venta de `ventas` | Salto las de `cantidad === 0` | Nada: uso `venta.cantidad` directo | `totalUnidades`, inicia en 0; sumo cada cantidad | No agrupo |
+| `ventaMayor(ventas)` | Cada venta de `ventas` | Salto las de `cantidad === 0` | Cada venta en su valor con `valorVenta` | No sumo: guardo el máximo. `ventaMaxValor` inicia en -1 y `ventaMaxRegistro` en `null`; actualizo solo si el valor es estrictamente mayor (en empate gana la primera). Devuelve el registro completo | No agrupo |
+| `ticketPromedio(ventas)` | Cada venta de `ventas`, para contar | Cuento solo las de `cantidad !== 0` | Nada propio: el total lo calcula `totalVendido` | `contadorValidas`, inicia en 0. Resultado: total ÷ contador; si el contador es 0, devuelve 0 | No agrupo |
+| `ventasPorCiudad(ventas, ciudad)` | Cada venta de `ventas` | Salto cantidad 0, ciudad que no es texto y ciudad distinta de la buscada | La ciudad buscada y la de cada venta a `trim().toLowerCase()`; cada venta que pasa, a su valor | `total`, inicia en 0 | No agrupo: una sola ciudad, elegida por filtro |
+
+## 2. Versiones con métodos de arreglo (sufijo M)
+
+| Función | ¿Qué recorro? | ¿Qué filtro? (`filter`) | ¿Qué transformo? (`map`) | ¿Qué acumulo? (`reduce`) | ¿Cómo agrupo? |
+|---|---|---|---|---|---|
+| `totalVendidoM(ventas)` | `ventas` completo, de forma implícita (sin `for`) | `cantidad !== 0` | Cada venta en su valor con `valorVenta` | Suma, valor inicial 0 | No agrupo |
+| `unidadesVendidasM(ventas)` | `ventas` completo, de forma implícita | `cantidad !== 0` | Cada venta en su `cantidad` | Suma, valor inicial 0 | No agrupo |
+| `ventasPorCiudadM(ventas, ciudad)` | `ventas` completo, de forma implícita | `cantidad !== 0`, ciudad de la venta en texto y ciudad normalizada igual a la buscada | Cada venta en su valor con `valorVenta` | Suma, valor inicial 0 | No agrupo: una sola ciudad, elegida por filtro |
+
+## 3. Agrupaciones y ranking (objeto como diccionario)
+
+| Función | ¿Qué recorro? | ¿Qué filtro? | ¿Qué transformo? | ¿Qué acumulo? | ¿Cómo agrupo? |
+|---|---|---|---|---|---|
+| `totalPorCiudad(ventas)` | Cada venta de `ventas` | Salto cantidad 0 y ciudad que no es texto | La ciudad en clave con `trim().toLowerCase()`; la venta en su valor | `totales[ciudad]`, cada clave inicia en 0 la primera vez que aparece; sumo el valor | Por ciudad normalizada: `"Bogotá"` y `"Bogotá "` quedan en la clave `bogotá` |
+| `unidadesPorProducto(ventas)` | Cada venta de `ventas` | Salto cantidad 0 y producto que no es texto | El producto en clave con `trim()` | `unidades[producto]`, cada clave inicia en 0; sumo `venta.cantidad` | Por producto con nombre completo (con gramaje) |
+| `topProductosPorValor(ventas, k)` | Dos recorridos: las ventas, para acumular, y las claves del diccionario, para armar el ranking | Salto cantidad 0 y producto que no es texto. Si `k` no es un entero mayor o igual a 0, devuelve `[]` | La venta en su valor; cada clave en un objeto `{ producto, valor }` | `valores[producto]`, cada clave inicia en 0; sumo el valor | Por producto con nombre completo. Después ordeno un arreglo nuevo de mayor a menor valor (empate: por nombre) y tomo los primeros `k` con `slice(0, k)`. No modifico `ventas` |
+
+## 4. Correspondencia ciclo → método
+
+| En el ciclo | En los métodos |
+|---|---|
+| `if (venta.cantidad === 0) continue;` | `filter((venta) => venta.cantidad !== 0)` |
+| `valorVenta(venta)` o `venta.cantidad` | `map(...)` |
+| `total += valor;` con `total` iniciando en 0 | `reduce((acumulado, valor) => acumulado + valor, 0)` |
+| Arreglo vacío: el ciclo no entra y devuelve 0 | El valor inicial 0 evita que `reduce` falle |

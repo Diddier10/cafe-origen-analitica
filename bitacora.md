@@ -194,3 +194,72 @@ Regla de venta válida: `cantidad !== 0`. Las ventas con cantidad 0 se filtran e
 | `valorVenta(venta)` o `venta.cantidad` | `map(...)` |
 | `total += valor;` con `total` iniciando en 0 | `reduce((acumulado, valor) => acumulado + valor, 0)` |
 | Arreglo vacío: el ciclo no entra y devuelve 0 | El valor inicial 0 evita que `reduce` falle |
+
+# Depuración de los errores reportados por la gerente
+
+**Aviso de método:** no se tuvo el código de la versión preliminar del compañero. Las versiones
+defectuosas de `src/reproducir_errores.js` son reconstrucciones mínimas hechas a partir de cada
+síntoma: demuestran qué causa puede producirlo, no que esa fuera la causa real de su versión.
+Reproducción: `node src/reproducir_errores.js`
+
+---
+
+## Error 1: "Bogotá aparecía dos veces"
+
+**Síntoma:** en el reporte, una misma ciudad aparece como dos filas distintas, cada una con una parte del total.
+
+**Entrada que lo produce:** ventas cuya ciudad se escribe distinto para la misma ciudad. Con los datos
+reales ocurre con `"Medellín"` (IDs 1, 4 y 11) y `"medellín "` (ID 5), que dan 5 grupos en vez de 4.
+Para Bogotá, una entrada equivalente es `["Bogotá", "Bogotá "]`.
+
+**Hipótesis y prueba realizada** (versión defectuosa: agrupa por la ciudad tal cual viene):
+
+| Hipótesis | Entrada | Defectuosa | Versión actual | Estado |
+|---|---|---|---|---|
+| H1: espacio al final | `"Bogotá"`, `"Bogotá "` | 2 grupos | 1 grupo | Corregido |
+| H1: otra capitalización | `"Bogotá"`, `"BOGOTÁ"` | 2 grupos | 1 grupo | Corregido |
+| H1: espacio no separable | `"Bogotá"`, `"Bogotá\u00A0"` | 2 grupos | 1 grupo | Corregido |
+| H2: tilde como carácter combinado | `"Bogotá"`, `"Bogota\u0301"` | 2 grupos | **2 grupos** | **Persiste** |
+| H3: sin tilde | `"Bogotá"`, `"Bogota"` | 2 grupos | **2 grupos** | **Persiste** |
+| Datos reales (`datos.js`) | `"Medellín"`, `"medellín "` | 5 grupos | 4 grupos | Corregido |
+
+**Causa:** la clave del grupo era el texto crudo de la ciudad, así que cualquier diferencia de escritura
+creaba un grupo nuevo. En H2, "Bogotá" tiene 6 caracteres y la otra variante 7 (la tilde es un carácter
+aparte), pero se ven idénticas en pantalla, lo que la hace la más difícil de detectar a simple vista.
+
+**Corrección aplicada (H1 y datos reales):** la clave sale de `formatearCiudad` (`trim()`, minúsculas e
+inicial de cada palabra en mayúscula) en `totalPorCiudad`, y `ventasPorCiudad` compara con `trim()` y
+`toLowerCase()`. Cubierto por aserciones en `reproducir_errores.js`.
+
+**Pendiente (H2 y H3):** la normalización actual no unifica la tilde combinada ni la ausencia de tilde.
+Requiere decidir entre: A) normalizar la forma Unicode (`normalize('NFC')`) y mantener la tilde, o
+B) además ignorar las tildes al agrupar. No está corregido.
+
+---
+
+## Error 2: ticket promedio `NaN` al filtrar un día sin ventas
+
+**Síntoma:** el ticket promedio mostraba `NaN` en lugar de un valor.
+
+**Entrada que lo produce:** un día sin ventas (`ventasDelDia(ventas, "2026-09-07")` devuelve `[]`),
+o un día en que solo hay ventas de cantidad 0.
+
+**Hipótesis y prueba realizada:**
+
+| Hipótesis | Entrada | Defectuosa | Versión actual | Estado |
+|---|---|---|---|---|
+| H1: división 0 ÷ 0 sin guarda | día sin ventas `[]` | `NaN` | `0` (ciclo y métodos) | Corregido |
+| H1: división 0 ÷ 0 sin guarda | solo cantidad 0 | `NaN` | `0` (ciclo y métodos) | Corregido |
+| H2: dato inválido (cantidad sin definir) | un registro sin `cantidad` | `NaN` | **`NaN`** | **Persiste** |
+
+La H2 no es el síntoma reportado (un día sin ventas), pero es otra ruta hacia el mismo `NaN`.
+
+**Causa (H1):** la versión defectuosa divide el total (0) entre el número de ventas válidas (0) sin
+revisar que sea cero, y 0 ÷ 0 da `NaN` en JavaScript.
+
+**Corrección aplicada:** `ticketPromedio` y `ticketPromedioM` devuelven 0 cuando no hay ventas válidas,
+antes de dividir. Demostración: con el día sin ventas, las 15 funciones que reciben ese resultado
+devuelven 0, `null`, `{}` o `[]`, sin `NaN`, y el reporte muestra "Ticket promedio por compra: $ 0".
+Verificado también con una mutación: al quitar la guarda, el script falla.
+
+**Pendiente (H2):** la validación de datos de entrada (cantidad o precio no numéricos) no está implementada.

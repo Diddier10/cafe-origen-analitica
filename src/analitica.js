@@ -89,59 +89,93 @@ function ventasPorCiudadM(ventas,ciudad){
         .map((venta)=> valorVenta(venta))
         .reduce((acumulado,valor)=> acumulado + valor,0)
 }
-function totalporCiudad(ventas){
-    const totales={};
-    for(const venta of ventas) {
-        if(venta.cantidad === 0) continue;
-        if(typeof venta.ciudad !== 'string')continue;
-        const ciudad = venta.ciudad.trim().toLowerCase();
-        if (! Object.prototype.hasOwnProperty.call(totales,ciudad)){
-            totales[ciudad]=0; 
-        }
-        totales[ciudad]+=valorVenta(venta);
-    }
-    return totales
+function ventaMayorM(ventas) {
+    return ventas
+        .filter((venta) => venta.cantidad !== 0)
+        .reduce((maximo, venta) => {
+            const valor = valorVenta(venta);
+            return valor > maximo.valor ? { valor: valor, registro: venta } : maximo;
+        }, { valor: -1, registro: null })
+        .registro;
 }
-function unidadesPorProducto(ventas){
-    const unidades = {};
-    for(const venta of ventas){
-        if(venta.cantidad === 0)continue;
-        if(typeof venta.producto !== 'string')continue;
-        const producto = venta.producto.trim();
-        if(!Object.prototype.hasOwnProperty.call(unidades,producto)){
-            unidades[producto]=0;
+
+function ticketPromedioM(ventas) {
+    const cantidadValidas = ventas.filter((venta) => venta.cantidad !== 0).length;
+    if (cantidadValidas === 0) {
+        return 0;
+    }
+    return totalVendidoM(ventas) / cantidadValidas;
+}
+
+function formatearCiudad(ciudad) {
+    return ciudad
+        .trim()
+        .toLowerCase()
+        .split(' ')
+        .map((palabra) => palabra.charAt(0).toUpperCase() + palabra.slice(1))
+        .join(' ');
+}
+
+function totalPorCiudad(ventas) {
+    const totales = {};
+    for (const venta of ventas) {
+        if (venta.cantidad === 0) continue;
+        if (typeof venta.ciudad !== 'string') continue;
+        const ciudad = formatearCiudad(venta.ciudad);
+        if (!Object.prototype.hasOwnProperty.call(totales, ciudad)) {
+            totales[ciudad] = 0;
         }
-        unidades[producto]+= venta.cantidad;
+        totales[ciudad] += valorVenta(venta);
+    }
+    return totales;
+}
+function unidadesPorProducto(ventas) {
+    const unidades = {};
+    for (const venta of ventas) {
+        if (venta.cantidad === 0) continue;
+        if (typeof venta.producto !== 'string') continue;
+        const producto = venta.producto.trim();
+        if (!Object.prototype.hasOwnProperty.call(unidades, producto)) {
+            unidades[producto] = 0;
+        }
+        unidades[producto] += venta.cantidad;
     }
     return unidades;
 }
 
-function topProductosPorValor(valor,k){
-    if(!Number.isInteger(k) || k < 0){
+function topProductosPorValor(ventas, k) {
+    if (!Number.isInteger(k) || k < 0) {
         return [];
     }
-    const valores ={};
-    for(const venta of ventas){
-        if(venta.cantidad === 0) continue;
-        if(venta.cantidad !=='string')continue;
+    const valores = {};
+    for (const venta of ventas) {
+        if (venta.cantidad === 0) continue;
+        if (typeof venta.producto !== 'string') continue;
         const producto = venta.producto.trim();
-        if(!Object.prototype.hasOwnProperty.call(valores, producto)){
-            valores[producto]=0;
+        if (!Object.prototype.hasOwnProperty.call(valores, producto)) {
+            valores[producto] = 0;
         }
         valores[producto] += valorVenta(venta);
     }
-    const ranking = [];
-    for (const producto of Object.keys(valores)) {
-        ranking.push({ producto: producto, valor: valores[producto] });
-    }
-    ranking.sort((a, b) => {
+    const ranking = Object.entries(valores)
+        .map(([producto, valor]) => ({ producto: producto, valor: valor }));
+    const ordenado = [...ranking].sort((a, b) => {
         if (b.valor !== a.valor) return b.valor - a.valor;
         if (a.producto < b.producto) return -1;
         if (a.producto > b.producto) return 1;
         return 0;
     });
-    return ranking.slice(0, k);
+    return ordenado.slice(0, k);
 }
+
+function ventasDelDia(ventas, fecha) {
+    if (typeof fecha !== 'string') {
+        return [];
+    }
+    const fechaBuscada = fecha.trim();
+    return ventas.filter((venta) => typeof venta.fecha === 'string' && venta.fecha.trim() === fechaBuscada);
+}
+
 module.exports = {
     valorVenta,
     totalVendido,
@@ -151,5 +185,11 @@ module.exports = {
     ventasPorCiudad,
     totalVendidoM,
     unidadesVendidasM,
-    ventasPorCiudadM
+    ventasPorCiudadM,
+    ventaMayorM,
+    ticketPromedioM,
+    totalPorCiudad,
+    unidadesPorProducto,
+    topProductosPorValor,
+    ventasDelDia
 };

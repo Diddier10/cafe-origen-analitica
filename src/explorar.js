@@ -15,4 +15,7 @@ console.log(ventas[ventas.length - 1]);
 console.log(`Producto en la posicion 5 (indice 4): ${ventas[4].producto}`);
 
 console.log("Tabla completa de ventas: ");
-console.table(ventas);
+console.table(ventas);{
+    
+
+}

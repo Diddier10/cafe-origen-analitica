@@ -263,3 +263,99 @@ devuelven 0, `null`, `{}` o `[]`, sin `NaN`, y el reporte muestra "Ticket promed
 Verificado también con una mutación: al quitar la guarda, el script falla.
 
 **Pendiente (H2):** la validación de datos de entrada (cantidad o precio no numéricos) no está implementada.
+
+# DIA 2
+# PrediccioneS
+
+## A. Funciones ya medidas (NO es predicción previa)
+
+Medido en el paso anterior con n = 1.000, 10.000, 100.000 y 500.000: se multiplican por 10 cada vez.
+
+| Función | Operaciones medidas | Multiplicador al pasar de n a 10n |
+|---|---|---|
+| `totalVendido` | 2n | ×10 |
+| `ventaMayor` | 3n | ×10 |
+| `totalPorCiudad` | 4n | ×10 |
+
+## B. Predicciones previas a la medición (funciones sin instrumentar)
+
+| Función | Tu predicción | Predicción de Claude | Razonamiento | Medición | ¿Coincide? |
+|---|---|---|---|---|---|
+| `unidadesVendidas` | | ×10 (≈ 2n) | Un solo `for...of`. Por elemento: 1 visita + `cantidad === 0`. | | |
+| `ticketPromedio` | | ×10 (≈ 4n) | Dos recorridos: uno para contar las válidas y otro dentro de `totalVendido`. La división y la guarda son operaciones fijas. | | |
+| `ventasPorCiudad` | | ×10 (≈ 4n) | Un recorrido. Por elemento: visita, `cantidad === 0`, `typeof ciudad`, comparación con la ciudad buscada. | | |
+| `unidadesPorProducto` | | ×10 (≈ 4n) | Igual que `totalPorCiudad`: visita, cantidad, typeof y comprobación de clave. | | |
+| `topProductosPorValor` (k = 3) | | ×10 (≈ 4n + una constante) | Un recorrido para acumular, más ordenar los p productos distintos. Con p = 6 fijo, esa ordenación cuesta una constante. Si p creciera con n, la ordenación dominaría y pasaría a ser n log n. | | |
+| `ventasDelDia` | | ×10 | Un `filter`: visita y comparaciones por elemento. Devuelve un arreglo nuevo. | | |
+| `totalVendidoM`, `unidadesVendidasM`, `ventasPorCiudadM`, `ventaMayorM`, `ticketPromedioM` | | ×10 | Encadenan `filter`, `map` y `reduce`, entre 2 y 4 pasadas. Una cantidad constante de pasadas no cambia el orden de crecimiento. El costo extra está en la memoria: arreglos intermedios. | | |
+| `valorVenta` | | ×1 | No recorre datos: una multiplicación por llamada, sin importar n. | | |
+| `formatearCiudad` | | ×1 por llamada | El largo del nombre de ciudad no depende de n. Se llama n veces desde `totalPorCiudad`. | | |
+
+## Predicción general
+
+Ninguna función del motor actual debería crecer más que linealmente, mientras el número de productos
+y ciudades distintos se mantenga fijo. Con esa condición no espero una función cuadrática.
+
+# Predicciones contra resultados, y clasificación Big O
+
+Predicciones: las de la tabla "Predicciones previas a la medición" de Claude. Tres funciones ya estaban
+medidas cuando se escribieron (marcadas como "NO es predicción previa"), así que esas no cuentan como acierto.
+Tiempos medidos en un entorno de pruebas: los milisegundos absolutos cambian de equipo a equipo; las
+razones entre tamaños deberían parecerse.
+
+## 1. Funciones con contador de operaciones (nivel A)
+
+| Función | Operaciones medidas | Predicción | Clasificación | Justificación |
+|---|---|---|---|---|
+| `totalVendido` | 2n (200 / 2.000 / 20.000 / 200.000) | ×10 (ya medida, no es predicción previa) | **O(n)** | Un solo `for...of`: por elemento, 1 visita + 1 comparación. Al multiplicar n por 10, las operaciones se multiplican por 10,00 en las tres transiciones. |
+| `ventaMayor` | 3n (300 / 3.000 / 30.000 / 300.000) | ×10 (ya medida) | **O(n)** | Un solo `for...of`: 1 visita + 1 comparación + la comparación `valor > ventaMaxValor`. Cada transición da x10,00. |
+| `totalPorCiudad` | 4n (400 / 4.000 / 40.000 / 400.000) | ×10 (ya medida) | **O(n)** | Un solo `for...of`: visita + 3 comparaciones. Buscar la clave en el diccionario no depende de n. Cada transición da x10,00. |
+| `primeraVenta` | 2 en todos los tamaños | ×1 (similar a `valorVenta`) | **O(1)** | No tiene ciclo: compara con el arreglo vacío y lee `ventas[0]`. Con 100 y con 100.000 ventas hace 2 operaciones; cada transición da x1,00. |
+
+## 2. Funciones sin contador (nivel B y C)
+
+Tiempo en ms con n = 1.000.000 y razón al pasar de 100.000 a 1.000.000 (rango de las dos corridas).
+Si el tiempo crece como n^k: razón ≈ 10 equivale a k ≈ 1 (lineal); razón ≈ 100 equivaldría a k ≈ 2.
+
+| Función | ms (n = 1M) | Razón 100k -> 1M | Predicción | Clasificación | Justificación |
+|---|---|---|---|---|---|
+| `unidadesVendidas` | 3,2 a 3,4 | x10,4 a x10,8 | ×10 (≈ 2n) | **O(n)** | Un `for...of`, igual que `totalVendido`. Tiempo casi idéntico (3,3 ms). |
+| `ticketPromedio` | 6,6 a 6,8 | x10,6 | ×10 (≈ 4n) | **O(n)** | Dos recorridos (cuenta las válidas y luego `totalVendido`). Tarda 2,0 veces lo que `totalVendido`, como se esperaba con dos pasadas. Dos pasadas siguen siendo O(n). |
+| `ventasPorCiudad` | 24,5 a 26,6 | x10,4 a x11,5 | ×10 (≈ 4n) | **O(n)** | Un `for...of`; por elemento, `trim` y `toLowerCase` sobre un texto de largo acotado. |
+| `unidadesPorProducto` | 37,7 a 38,1 | x9,4 a x10,1 | ×10 (≈ 4n) | **O(n)** | Un `for...of` con diccionario. Buscar y sumar en el diccionario no depende de n. |
+| `topProductosPorValor` (k = 3) | 41,5 a 41,8 | x10,2 a x10,3 | ×10 (≈ 4n + constante) | **O(n)** con p fijo | Un recorrido de n ventas, más ordenar los p productos distintos: O(n + p log p). Con p = 6 la ordenación es despreciable. Ver la sección 3. |
+| `ventasDelDia` | 14,4 a 15,0 | x10,6 a x11,3 | ×10 | **O(n)** | Un solo `filter`. |
+| `totalVendidoM` | 51,8 a 52,4 | x12,6 a x13,4 | ×10 | **O(n)** | `filter`, `map` y `reduce`: tres pasadas. Una cantidad constante de pasadas sigue siendo O(n). |
+| `unidadesVendidasM` | 45,7 a 48,4 | x13,3 | ×10 | **O(n)** | Igual: tres pasadas. |
+| `ventasPorCiudadM` | 38,5 a 47,3 | x9,8 a x11,6 | ×10 | **O(n)** | Igual: tres pasadas. |
+| `ventaMayorM` | 34,5 a 36,5 | x14,0 a x14,9 | ×10 | **O(n)** | `filter` y `reduce`: dos pasadas. |
+| `ticketPromedioM` | 76,0 a 78,3 | x13,9 | ×10 | **O(n)** | `filter` y luego `totalVendidoM`: cuatro pasadas en total. |
+| `valorVenta` | no medida | n/a | ×1 | **O(1)** | Una multiplicación; no recorre datos. Solo el código. |
+| `formatearCiudad` | no medida | n/a | ×1 por llamada | **O(1) respecto a n** | Trabaja sobre un texto cuyo largo no depende de n. Se llama n veces desde `totalPorCiudad`, que aporta el O(n). Solo el código. |
+
+## 3. Qué acertó la predicción y qué no
+
+**Acertó**
+- Ninguna función crece más que linealmente en operaciones, y no apareció ninguna cuadrática.
+- Las funciones de un solo recorrido se multiplican por 10 (x10,00 exacto con el contador y entre x10 y x11 con el tiempo).
+- `ticketPromedio` cuesta el doble que `totalVendido`: dos recorridos.
+- `totalPorCiudad` tiene un costo por elemento mucho mayor que `totalVendido`.
+
+**Falló o quedó incompleta**
+- **Las versiones `M` no crecen ×10 en tiempo.** Se multiplican por x13 a x15 al pasar de 100.000 a 1.000.000, aunque en operaciones sean O(n). La predicción decía que el costo extra estaría en la memoria (arreglos intermedios) y sigue siendo la explicación más probable, pero no la medí: no está confirmada. Es el punto de partida del análisis de memoria.
+- **El contador no ve el costo real.** `totalPorCiudad` hace solo 2 veces las operaciones de `totalVendido` (4n contra 2n), pero tarda unas 64 veces más (≈ 211 ms contra 3,3 ms con 1M). La diferencia está en `trim`, `toLowerCase`, `split`, `map` y `join`, que la regla de conteo no cuenta. Dos funciones con la misma clase Big O pueden diferir en costo por factores enormes.
+- **Las cifras por elemento de las funciones sin contador (≈ 2n, ≈ 4n) siguen sin verificar.** Solo se verificó el comportamiento ×10.
+
+## 4. Casos que no encajan limpiamente
+
+- `topProductosPorValor`: O(n) solo mientras el número de productos distintos (p) se mantenga fijo. Si p creciera con n, la ordenación pasaría a dominar y la clase sería O(n log n).
+- `ticketPromedio` con n = 10.000 dio un tiempo anómalo (0,023 ms, menos que el de `totalVendido`, 0,07 ms, que además es una parte de ella). Es un artefacto de medición con tamaños pequeños, no una propiedad del código. Con tamaños grandes la razón es normal (x10,6). Por eso la tabla usa el paso de 100.000 a 1.000.000.
+- Las funciones de un solo recorrido muestran razones de x4 a x5 al pasar de 10.000 a 100.000. A n pequeña pesan el calentamiento del motor y los costos fijos de cada llamada, y no el recorrido.
+
+## 5. Conclusión
+
+| Clase | Funciones |
+|---|---|
+| O(1) | `primeraVenta`, `valorVenta`, `formatearCiudad` (respecto a n) |
+| O(n) | Todas las demás |
+| O(n²) | Ninguna |
